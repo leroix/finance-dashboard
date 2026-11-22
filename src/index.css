@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --color-ink: #10120e;
+  --color-panel: #1b1e16;
+  --color-panel-2: #24281d;
+  --color-line: #353a2c;
+  --color-paper: #f3efe4;
+  --color-muted: #b7b1a2;
+  --color-faint: #847e70;
+  --color-brass: #e2b45c;
+  --color-good: #b7d39c;
+  --color-bad: #f0a394;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(900px 420px at 0% -10%, rgb(226 180 92 / 0.09), transparent 55%),
+      radial-gradient(700px 380px at 100% 0%, rgb(183 211 156 / 0.06), transparent 45%),
+      var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  ::selection {
+    background: #e2b45c;
+    color: #10120e;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brass);
+    outline-offset: 2px;
+  }
+}
+
+@utility num {
+  font-family: var(--font-serif);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  font-optical-sizing: auto;
+}
+
+@utility card {
+  border: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 92%, black);
+  border-radius: 1.25rem;
+}
