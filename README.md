@@ -43,36 +43,30 @@ SimpleFIN date ranges are limited (a warning past about 45 days, a hard cap near
 
 ## Deploy on GitHub Pages
 
-The intended site is a project page: `https://<user>.github.io/<repo>/`.
+The site is the project page [https://leroix.github.io/finance-dashboard/](https://leroix.github.io/finance-dashboard/). Create the GitHub repository as `finance-dashboard` under the user `leroix`. The Pages base path is `/finance-dashboard/`.
 
-GitHub Pages cannot set response headers, so the Content-Security-Policy lives in a `<meta>` tag written into `dist/index.html` at build time. Navigation is hash-based (`#/accounts`), so Pages does not need a rewrite rule. Asset URLs default to relative (`./assets/...`), which resolve inside the repo subpath.
+GitHub Pages cannot set response headers, so the Content-Security-Policy lives in a `<meta>` tag written into `dist/index.html` at build time. Navigation is hash-based (`#/accounts`), so Pages does not need a rewrite rule. The workflow sets `SABLE_BASE=/finance-dashboard/`, which makes asset URLs absolute from that path (`/finance-dashboard/assets/...`). If `SABLE_BASE` is unset, the build falls back to relative URLs (`./assets/...`).
 
 ### Steps
 
-1. Create a GitHub repository and push this project to its `main` branch. The workflow file is `.github/workflows/pages.yml`.
-2. Open the repository on GitHub and go to **Settings → Pages**.
+1. Create the GitHub repository `leroix/finance-dashboard` and push this project to its `main` branch. The workflow file is `.github/workflows/pages.yml`.
+2. Open `https://github.com/leroix/finance-dashboard` and go to **Settings → Pages**.
 3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 4. Push to `main`, or open the **Actions** tab and run **Deploy GitHub Pages** with **Run workflow**.
-5. Wait until the `deploy` job finishes. The job publishes the `dist/` artifact. The Pages settings page then shows the site URL, which is `https://<user>.github.io/<repo>/`.
-6. Open that URL with the trailing slash. The first successful run also creates a `github-pages` environment. The workflow does not need any secrets.
+5. Wait until the `deploy` job finishes. The job publishes the `dist/` artifact. The Pages settings page then shows `https://leroix.github.io/finance-dashboard/`.
+6. Open [https://leroix.github.io/finance-dashboard/](https://leroix.github.io/finance-dashboard/) with the trailing slash. The first successful run also creates a `github-pages` environment. The workflow does not need any secrets.
 
-The workflow runs `npm ci`, `npm test`, and `npm run build` with `SABLE_BASE=./` on Node 22, then `actions/upload-pages-artifact` and `actions/deploy-pages`. `public/.nojekyll` is copied into `dist/` so Pages does not run Jekyll on the bundle.
+The workflow runs `npm ci`, `npm test`, and `npm run build` with `SABLE_BASE=/finance-dashboard/` on Node 22, then `actions/upload-pages-artifact` and `actions/deploy-pages`. `public/.nojekyll` is copied into `dist/` so Pages does not run Jekyll on the bundle.
 
 To build the same files yourself:
 
 ```bash
 npm ci
 npm test
-SABLE_BASE=./ npm run build
+SABLE_BASE=/finance-dashboard/ npm run build
 ```
 
-`dist/` is what Pages serves. To force absolute asset paths instead of relative ones:
-
-```bash
-SABLE_BASE=/<repo>/ npm run build
-```
-
-`SABLE_BASE` accepts `./` (the default) or a path such as `sable` or `/sable/`. A path is given a leading slash if it needs one, and a trailing slash always.
+`dist/` is what Pages serves. `SABLE_BASE` accepts `./` or a path such as `finance-dashboard` or `/finance-dashboard/`. A path is given a leading slash if it needs one, and a trailing slash always.
 
 ### Content-Security-Policy
 
@@ -92,7 +86,7 @@ frame-ancestors 'none';
 worker-src 'none'
 ```
 
-`'self'` is the origin `https://<user>.github.io`, so scripts and fonts loaded from `https://<user>.github.io/<repo>/assets/` are allowed. `connect-src` still allows only that origin and the two SimpleFIN bridge hosts. There is no inline script in the production HTML. `style-src` allows inline style attributes so chart bars can set a width. Browsers ignore `frame-ancestors` inside a meta tag, and Pages cannot set it as a header. The other directives are enforced from the meta tag.
+`'self'` is the origin `https://leroix.github.io`, so scripts and fonts loaded from `https://leroix.github.io/finance-dashboard/assets/` are allowed. `connect-src` still allows only that origin and the two SimpleFIN bridge hosts. There is no inline script in the production HTML. `style-src` allows inline style attributes so chart bars can set a width. Browsers ignore `frame-ancestors` inside a meta tag, and Pages cannot set it as a header. The other directives are enforced from the meta tag.
 
 ### Passkeys on `github.io`
 
@@ -100,12 +94,12 @@ The relying party id is the page hostname, not the repo path.
 
 | Page | RP ID | Result |
 | --- | --- | --- |
-| `https://<user>.github.io/<repo>/` | `<user>.github.io` | Valid. `github.io` is a public suffix, so `<user>.github.io` is the registrable domain and matches the origin. |
+| `https://leroix.github.io/finance-dashboard/` | `leroix.github.io` | Valid. `github.io` is a public suffix, so `leroix.github.io` is the registrable domain and matches the origin. |
 | `https://github.io/` | `github.io` | Refused. Browsers will not use a public suffix as an RP ID, and Sable throws before calling WebAuthn. |
 | `http://localhost:47321` | `localhost` | Valid for local development. It is a different origin from the Pages site, so it will not unlock a passkey created there. |
 | `http://127.0.0.1:47321` | — | Refused. An IP address is not a valid RP ID. |
 
-The path `/<repo>/` is not part of the origin. IndexedDB and the passkey are shared by every Pages site on `https://<user>.github.io`, including other repositories. Publish Sable from a GitHub account that does not host anything else on Pages, or attach a custom domain so the origin is only this app. A custom domain changes the hostname, so lock the access URL again after DNS is serving the new name. The passkey created for `<user>.github.io` stays bound to that hostname.
+The path `/finance-dashboard/` is not part of the origin. IndexedDB and the passkey are shared by every Pages site on `https://leroix.github.io`, including other repositories under that user. Do not publish another Pages project from `leroix`, or attach a custom domain so the origin is only this app. A custom domain changes the hostname, so lock the access URL again after DNS is serving the new name. The passkey created for `leroix.github.io` stays bound to that hostname.
 
 Moving between `localhost` and Pages is an origin change. Take the access URL from your password manager, or restore an encrypted backup, and lock it again on the new host.
 

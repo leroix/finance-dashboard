@@ -36,9 +36,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Relative asset URLs. They resolve under https://<user>.github.io/<repo>/.
-          # Set this to /<repo>/ if you want absolute paths instead.
-          SABLE_BASE: ./
+          # Project site https://leroix.github.io/finance-dashboard/
+          SABLE_BASE: /finance-dashboard/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -164,8 +164,8 @@ export function Settings() {
           Sable does not have an account, analytics, or a backend. The only network requests are to
           beta-bridge.simplefin.org (bridge.simplefin.org is rewritten there because the public host redirects without
           CORS headers and drops the path). On GitHub Pages the passkey and the books belong to
-          https://&lt;user&gt;.github.io, which is shared by every project site on that host. A custom domain is a
-          different origin.
+          https://leroix.github.io, which is shared by every project site on that host, including
+          /finance-dashboard/. A custom domain is a different origin.
         </p>
       </section>
 

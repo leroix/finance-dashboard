@@ -9,17 +9,17 @@ describe('GitHub Pages base', () => {
     expect(resolveViteBase('.')).toBe('./')
   })
 
-  it('normalizes a project-site subpath', () => {
-    expect(resolveViteBase('sable')).toBe('/sable/')
-    expect(resolveViteBase('/sable')).toBe('/sable/')
-    expect(resolveViteBase('/my-name/sable/')).toBe('/my-name/sable/')
+  it('normalizes the finance-dashboard project path', () => {
+    expect(resolveViteBase('finance-dashboard')).toBe('/finance-dashboard/')
+    expect(resolveViteBase('/finance-dashboard')).toBe('/finance-dashboard/')
+    expect(resolveViteBase('/finance-dashboard/')).toBe('/finance-dashboard/')
   })
 })
 
 describe('WebAuthn rpId on github.io', () => {
   it('uses the user subdomain, which is the registrable domain', () => {
-    expect(webAuthnRpId('ada.github.io')).toBe('ada.github.io')
-    expect(webAuthnRpId('Ada.GitHub.io.')).toBe('ada.github.io')
+    expect(webAuthnRpId('leroix.github.io')).toBe('leroix.github.io')
+    expect(webAuthnRpId('Leroix.GitHub.io.')).toBe('leroix.github.io')
   })
 
   it('refuses the public suffix and IP addresses', () => {
