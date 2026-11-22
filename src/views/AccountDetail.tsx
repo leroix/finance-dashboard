@@ -18,10 +18,11 @@ export function AccountDetail({ id }: { id: string }) {
   const [period, setPeriod] = useState<PeriodKey>('1Y')
   const [editing, setEditing] = useState(false)
   const [limit, setLimit] = useState(80)
-  const [includeDraft, setIncludeDraft] = useState('')
+  const [includeDraft, setIncludeDraft] = useState('100')
   const todayIso = todayISO()
   useEffect(() => {
-    setIncludeDraft('')
+    const current = store.accounts.find((item) => item.id === id)
+    setIncludeDraft(String(normalizeIncludePercent(current?.includePercent)))
   }, [id])
   const view = useMemo(() => {
     if (!account) return null
@@ -42,11 +43,23 @@ export function AccountDetail({ id }: { id: string }) {
   const type = effectiveType(account)
   const includePercent = normalizeIncludePercent(account.includePercent)
   const weight = ownershipWeight(includePercent)
+  const accountId = account.id
   const txs = store.transactions
-    .filter((tx) => tx.accountId === account.id)
+    .filter((tx) => tx.accountId === accountId)
     .sort((a, b) => b.posted - a.posted)
   const shown = txs.slice(0, limit)
-  const includeField = includeDraft === '' ? String(includePercent) : includeDraft
+
+  function commitIncludePercent(raw: string) {
+    const trimmed = raw.trim()
+    const next = Number(trimmed)
+    if (trimmed === '' || !Number.isFinite(next)) {
+      setIncludeDraft(String(includePercent))
+      return
+    }
+    const clamped = normalizeIncludePercent(next)
+    setIncludeDraft(String(clamped))
+    if (clamped !== includePercent) void store.setIncludePercent(accountId, clamped)
+  }
 
   return (
     <div className="space-y-6 pb-10">
@@ -121,24 +134,30 @@ export function AccountDetail({ id }: { id: string }) {
             <span className="text-faint">Turn this on for a credit card or loan that reports what you owe as a positive number.</span>
           </span>
         </label>
-        <div className="md:col-span-2 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+        <div className="md:col-span-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
           <label className="block text-sm">
             <span className="mb-1.5 block text-muted">Share in net worth</span>
-            <input
-              className={controlClass}
-              inputMode="decimal"
-              value={includeField}
-              onChange={(event) => setIncludeDraft(event.target.value)}
-              onBlur={() => {
-                const next = Number(includeField)
-                if (!Number.isFinite(next)) {
-                  setIncludeDraft('')
-                  return
-                }
-                void store.setIncludePercent(account.id, next).then(() => setIncludeDraft(''))
-              }}
-              aria-describedby="include-help"
-            />
+            <span className="relative block">
+              <input
+                className={`${controlClass} pr-10`}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                step={1}
+                value={includeDraft}
+                onChange={(event) => setIncludeDraft(event.target.value)}
+                onBlur={() => commitIncludePercent(includeDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    ;(event.target as HTMLInputElement).blur()
+                  }
+                }}
+                aria-describedby="include-help"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-faint">%</span>
+            </span>
             <span id="include-help" className="mt-1.5 block text-xs text-faint">
               100 keeps the full balance. 0 excludes the account. 50 keeps half. The full balance is still shown above.
             </span>
@@ -147,7 +166,7 @@ export function AccountDetail({ id }: { id: string }) {
             variant="quiet"
             disabled={includePercent === 0}
             onClick={() => {
-              setIncludeDraft('')
+              setIncludeDraft('0')
               void store.setIncludePercent(account.id, 0)
             }}
           >
@@ -157,7 +176,7 @@ export function AccountDetail({ id }: { id: string }) {
             variant="quiet"
             disabled={includePercent === 100}
             onClick={() => {
-              setIncludeDraft('')
+              setIncludeDraft('100')
               void store.setIncludePercent(account.id, 100)
             }}
           >
