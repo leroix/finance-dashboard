@@ -21,7 +21,7 @@ npm test
 npm run dev
 ```
 
-The dev server is http://127.0.0.1:47321. Localhost is a secure context, so passkeys and WebCrypto work. `localhost` and `127.0.0.1` are different passkey origins.
+The dev server is http://127.0.0.1:47321. WebCrypto works there. Passkeys do not: an IP address cannot be a relying party id. For a local passkey, open http://localhost:47321 instead. `localhost` and `127.0.0.1` are different origins from each other and from GitHub Pages.
 
 ```bash
 npm run build    # static files in dist/
@@ -41,19 +41,42 @@ npm run preview  # serves dist/ with the production CSP
 
 SimpleFIN date ranges are limited (a warning past about 45 days, a hard cap near 90). Sable requests history in 40-day windows. Both the legacy `errors` string list and the newer `errlist` objects are sanitized and shown.
 
-## Deploy
+## Deploy on GitHub Pages
 
-Passkeys are bound to the site origin. Pick one HTTPS hostname and keep it.
+The intended site is a project page: `https://<user>.github.io/<repo>/`.
+
+GitHub Pages cannot set response headers, so the Content-Security-Policy lives in a `<meta>` tag written into `dist/index.html` at build time. Navigation is hash-based (`#/accounts`), so Pages does not need a rewrite rule. Asset URLs default to relative (`./assets/...`), which resolve inside the repo subpath.
+
+### Steps
+
+1. Create a GitHub repository and push this project to its `main` branch. The workflow file is `.github/workflows/pages.yml`.
+2. Open the repository on GitHub and go to **Settings → Pages**.
+3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+4. Push to `main`, or open the **Actions** tab and run **Deploy GitHub Pages** with **Run workflow**.
+5. Wait until the `deploy` job finishes. The job publishes the `dist/` artifact. The Pages settings page then shows the site URL, which is `https://<user>.github.io/<repo>/`.
+6. Open that URL with the trailing slash. The first successful run also creates a `github-pages` environment. The workflow does not need any secrets.
+
+The workflow runs `npm ci`, `npm test`, and `npm run build` with `SABLE_BASE=./` on Node 22, then `actions/upload-pages-artifact` and `actions/deploy-pages`. `public/.nojekyll` is copied into `dist/` so Pages does not run Jekyll on the bundle.
+
+To build the same files yourself:
 
 ```bash
 npm ci
 npm test
-npm run build
+SABLE_BASE=./ npm run build
 ```
 
-Upload the contents of `dist/` to any static host (Cloudflare Pages, Netlify, GitHub Pages, nginx, Caddy). The app uses hash routes (`#/accounts`), so the host does not need SPA rewrites. Asset URLs are relative.
+`dist/` is what Pages serves. To force absolute asset paths instead of relative ones:
 
-The built `index.html` already sends the Content-Security-Policy in a meta tag. `frame-ancestors` is ignored in meta tags; if the host can set headers, repeat the policy there:
+```bash
+SABLE_BASE=/<repo>/ npm run build
+```
+
+`SABLE_BASE` accepts `./` (the default) or a path such as `sable` or `/sable/`. A path is given a leading slash if it needs one, and a trailing slash always.
+
+### Content-Security-Policy
+
+The production meta policy is:
 
 ```
 default-src 'self';
@@ -69,9 +92,22 @@ frame-ancestors 'none';
 worker-src 'none'
 ```
 
-`style-src` allows inline style attributes so chart bars can set a width. Scripts are not allowed inline or from any other host.
+`'self'` is the origin `https://<user>.github.io`, so scripts and fonts loaded from `https://<user>.github.io/<repo>/assets/` are allowed. `connect-src` still allows only that origin and the two SimpleFIN bridge hosts. There is no inline script in the production HTML. `style-src` allows inline style attributes so chart bars can set a width. Browsers ignore `frame-ancestors` inside a meta tag, and Pages cannot set it as a header. The other directives are enforced from the meta tag.
 
-Serve over HTTPS. An origin change (including moving from localhost to the public host) means old passkeys will not decrypt the access URL. Use the password-manager copy or an encrypted backup, then lock it again on the new origin.
+### Passkeys on `github.io`
+
+The relying party id is the page hostname, not the repo path.
+
+| Page | RP ID | Result |
+| --- | --- | --- |
+| `https://<user>.github.io/<repo>/` | `<user>.github.io` | Valid. `github.io` is a public suffix, so `<user>.github.io` is the registrable domain and matches the origin. |
+| `https://github.io/` | `github.io` | Refused. Browsers will not use a public suffix as an RP ID, and Sable throws before calling WebAuthn. |
+| `http://localhost:47321` | `localhost` | Valid for local development. It is a different origin from the Pages site, so it will not unlock a passkey created there. |
+| `http://127.0.0.1:47321` | — | Refused. An IP address is not a valid RP ID. |
+
+The path `/<repo>/` is not part of the origin. IndexedDB and the passkey are shared by every Pages site on `https://<user>.github.io`, including other repositories. Publish Sable from a GitHub account that does not host anything else on Pages, or attach a custom domain so the origin is only this app. A custom domain changes the hostname, so lock the access URL again after DNS is serving the new name. The passkey created for `<user>.github.io` stays bound to that hostname.
+
+Moving between `localhost` and Pages is an origin change. Take the access URL from your password manager, or restore an encrypted backup, and lock it again on the new host.
 
 ## Passkey PRF support
 

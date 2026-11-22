@@ -1,4 +1,5 @@
 import { b64ToBytes, bytesToB64, exactBuffer, randomBytes } from './bytes.ts'
+import { webAuthnRpId } from './deploy.ts'
 
 export type PrfSupport = 'yes' | 'no' | 'unknown'
 
@@ -41,7 +42,7 @@ export async function createPrfCredential(): Promise<FreshPasskey> {
   const cred = await navigator.credentials.create({
     publicKey: {
       challenge: exactBuffer(randomBytes(32)),
-      rp: { name: 'Sable', id: location.hostname },
+      rp: { name: 'Sable', id: webAuthnRpId(location.hostname) },
       user: {
         id: exactBuffer(randomBytes(16)),
         name: 'owner',
@@ -71,7 +72,7 @@ export async function getPrfAssertion(credentialId: string, prfSalt: string): Pr
   const cred = await navigator.credentials.get({
     publicKey: {
       challenge: exactBuffer(randomBytes(32)),
-      rpId: location.hostname,
+      rpId: webAuthnRpId(location.hostname),
       userVerification: 'required',
       allowCredentials: [{ type: 'public-key', id: exactBuffer(b64ToBytes(credentialId)) }],
       timeout: 60_000,

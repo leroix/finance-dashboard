@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
+import { resolveViteBase } from './src/lib/deploy.ts'
 
 const PROD_CSP = [
   "default-src 'self'",
@@ -39,7 +40,7 @@ function cspPlugin() {
 }
 
 export default defineConfig({
-  base: './',
+  base: resolveViteBase(process.env.SABLE_BASE),
   plugins: [react(), tailwindcss(), cspPlugin()],
   server: {
     host: '127.0.0.1',
