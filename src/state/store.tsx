@@ -7,6 +7,7 @@ import { eraseDatabase, loadBundle, persistBundle, type Bundle } from '../lib/db
 import { todayISO, unixNow } from '../lib/dates.ts'
 import { downloadText } from '../lib/download.ts'
 import { snapshotKey, transactionKey, applySync } from '../lib/merge.ts'
+import { normalizeIncludePercent } from '../lib/networth.ts'
 import { createPrfCredential, detectPrfSupport, getPrfAssertion, passkeyErrorMessage, type PrfSupport } from '../lib/passkey.ts'
 import { publicErrorMessage } from '../lib/sanitize.ts'
 import { getAccessUrl, hasAccessUrl, setAccessUrl } from '../lib/session.ts'
@@ -75,6 +76,7 @@ export interface Store extends AppState {
   deleteManual: (id: string) => Promise<boolean>
   setType: (id: string, type: AccountType | null) => Promise<boolean>
   setInvert: (id: string, invert: boolean | null) => Promise<boolean>
+  setIncludePercent: (id: string, percent: number) => Promise<boolean>
   setFlow: (key: string, flow: FlowClass | null) => Promise<boolean>
   setLookback: (days: number) => Promise<boolean>
   setForecast: (settings: Settings) => Promise<boolean>
@@ -129,6 +131,7 @@ function booksFromParsed(parsed: ParsedSet, today: string): Books {
     inferredType: inferAccountType(account.name, account.institution),
     typeOverride: null,
     invertOwed: null,
+    includePercent: 100,
     holdings: account.holdings,
     updatedAt,
   }))
@@ -168,7 +171,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadBundle()
       .then((bundle) => {
         if (cancelled) return
-        const next = { ...stateRef.current, ...bundle, ready: true, bootError: null }
+        const accounts = bundle.accounts.map((account) => ({
+          ...account,
+          includePercent: normalizeIncludePercent(account.includePercent),
+        }))
+        const next = { ...stateRef.current, ...bundle, accounts, ready: true, bootError: null }
         stateRef.current = next
         setState(next)
       })
@@ -415,6 +422,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           inferredType: input.type,
           typeOverride: null,
           invertOwed: input.type === 'liability' ? true : null,
+          includePercent: 100,
           holdings: [],
           updatedAt: Date.now(),
         }
@@ -480,6 +488,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await commit({
           accounts: stateRef.current.accounts.map((account) =>
             account.id === id ? { ...account, invertOwed: invert } : account,
+          ),
+        })
+      }),
+    setIncludePercent: (id, percent) =>
+      run(async () => {
+        const includePercent = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 100))
+        await commit({
+          accounts: stateRef.current.accounts.map((account) =>
+            account.id === id ? { ...account, includePercent } : account,
           ),
         })
       }),

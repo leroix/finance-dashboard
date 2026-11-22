@@ -12,9 +12,24 @@ export function effectiveType(account: Pick<AccountRecord, 'inferredType' | 'typ
   return account.typeOverride ?? account.inferredType
 }
 
-export function contribution(balance: number, type: AccountType, invertOwed: boolean | null): number {
-  if (type === 'liability' && invertOwed) return roundCents(-balance)
-  return roundCents(balance)
+/** Clamp a stored ownership share to 0–100 and return it as a 0–1 weight. */
+export function ownershipWeight(includePercent: number | null | undefined): number {
+  const pct = includePercent == null || !Number.isFinite(includePercent) ? 100 : includePercent
+  return Math.min(100, Math.max(0, pct)) / 100
+}
+
+export function normalizeIncludePercent(includePercent: number | null | undefined): number {
+  return Math.round(ownershipWeight(includePercent) * 100)
+}
+
+export function contribution(
+  balance: number,
+  type: AccountType,
+  invertOwed: boolean | null,
+  includePercent: number | null | undefined = 100,
+): number {
+  const signed = type === 'liability' && invertOwed ? -balance : balance
+  return roundCents(signed * ownershipWeight(includePercent))
 }
 
 export function isSummableCurrency(currency: string): boolean {
@@ -41,13 +56,17 @@ export interface Totals {
 
 export function computeTotals(accounts: AccountRecord[]): Totals {
   const currency = reportingCurrency(accounts) ?? 'USD'
-  const included = accounts.filter((account) => account.currency === currency)
-  const excluded = accounts.filter((account) => account.currency !== currency)
+  const sameCurrency = accounts.filter((account) => account.currency === currency)
+  const included = sameCurrency.filter((account) => ownershipWeight(account.includePercent) > 0)
+  const excluded = [
+    ...accounts.filter((account) => account.currency !== currency),
+    ...sameCurrency.filter((account) => ownershipWeight(account.includePercent) === 0),
+  ]
   const byType: Record<AccountType, number> = { cash: 0, liability: 0, investment: 0, other: 0 }
   const institutions = new Map<string, number>()
   let netWorth = 0
   for (const account of included) {
-    const value = contribution(account.balance, effectiveType(account), account.invertOwed)
+    const value = contribution(account.balance, effectiveType(account), account.invertOwed, account.includePercent)
     netWorth += value
     byType[effectiveType(account)] += value
     const name = account.institution || 'Unknown'

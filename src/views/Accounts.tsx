@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Button, Field, Money, controlClass } from '../components/ui.tsx'
-import { effectiveType } from '../lib/networth.ts'
-import { contribution } from '../lib/networth.ts'
+import { contribution, effectiveType, normalizeIncludePercent, ownershipWeight } from '../lib/networth.ts'
 import { TYPE_LABEL, type AccountType } from '../lib/types.ts'
 import { accountHref } from '../router.ts'
 import { useStore, type ManualInput } from '../state/store.tsx'
@@ -31,31 +30,41 @@ export function Accounts() {
         </div>
       ) : (
         <ul className="card divide-y divide-line">
-          {store.accounts.map((account) => (
-            <li key={account.id}>
-              <a href={accountHref(account.id)} className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-panel-2">
-                <span>
-                  <span className="block">{account.name}</span>
-                  <span className="block text-sm text-faint">
-                    {account.institution} · {TYPE_LABEL[effectiveType(account)]}
-                    {account.source === 'manual' ? ' · manual' : ''}
+          {store.accounts.map((account) => {
+            const includePercent = normalizeIncludePercent(account.includePercent)
+            const weight = ownershipWeight(includePercent)
+            return (
+              <li key={account.id}>
+                <a href={accountHref(account.id)} className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-panel-2">
+                  <span>
+                    <span className="block">{account.name}</span>
+                    <span className="block text-sm text-faint">
+                      {account.institution} · {TYPE_LABEL[effectiveType(account)]}
+                      {account.source === 'manual' ? ' · manual' : ''}
+                      {weight === 0 ? ' · excluded' : weight < 1 ? ` · ${includePercent}%` : ''}
+                    </span>
                   </span>
-                </span>
-                <span className="text-right">
-                  <span className="num block text-xl">
-                    <Money value={account.balance} currency={account.currency} />
+                  <span className="text-right">
+                    <span className="num block text-xl">
+                      <Money value={account.balance} currency={account.currency} />
+                    </span>
+                    <span className="block text-xs text-faint">
+                      In net worth{' '}
+                      <Money
+                        value={contribution(
+                          account.balance,
+                          effectiveType(account),
+                          account.invertOwed,
+                          account.includePercent,
+                        )}
+                        currency={account.currency}
+                      />
+                    </span>
                   </span>
-                  <span className="block text-xs text-faint">
-                    In net worth{' '}
-                    <Money
-                      value={contribution(account.balance, effectiveType(account), account.invertOwed)}
-                      currency={account.currency}
-                    />
-                  </span>
-                </span>
-              </a>
-            </li>
-          ))}
+                </a>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

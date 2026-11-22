@@ -107,6 +107,10 @@ function completeAccount(account: AccountRecord): AccountRecord {
     inferredType: account.inferredType ?? 'other',
     typeOverride: account.typeOverride ?? null,
     invertOwed: account.invertOwed ?? null,
+    includePercent:
+      typeof account.includePercent === 'number' && Number.isFinite(account.includePercent)
+        ? Math.min(100, Math.max(0, account.includePercent))
+        : 100,
     holdings: account.holdings ?? [],
     updatedAt: account.updatedAt ?? Date.now(),
   }

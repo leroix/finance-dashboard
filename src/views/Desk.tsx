@@ -5,7 +5,7 @@ import { Banner, Button, Money, PeriodTabs } from '../components/ui.tsx'
 import { formatPct, formatSignedMoney } from '../lib/money.ts'
 import { buildDesk } from '../lib/model.ts'
 import { todayISO } from '../lib/dates.ts'
-import { effectiveType } from '../lib/networth.ts'
+import { effectiveType, normalizeIncludePercent, ownershipWeight } from '../lib/networth.ts'
 import type { PeriodKey } from '../lib/returns.ts'
 import { TYPE_LABEL } from '../lib/types.ts'
 import { accountHref } from '../router.ts'
@@ -127,6 +127,12 @@ export function Desk() {
         </section>
       ) : null}
 
+      {desk.omitted.length > 0 ? (
+        <p className="text-sm text-muted">
+          {desk.omitted.length} account{desk.omitted.length === 1 ? '' : 's'} {desk.omitted.length === 1 ? 'is' : 'are'}{' '}
+          excluded from net worth. Open an account to include a percentage of it again.
+        </p>
+      ) : null}
       {desk.excluded.length > 0 ? (
         <p className="text-sm text-muted">
           {desk.excluded.length} account{desk.excluded.length === 1 ? '' : 's'} use another currency and {desk.excluded.length === 1 ? 'is' : 'are'} listed
@@ -136,26 +142,31 @@ export function Desk() {
 
       {desk.rows.length > 0 ? (
         <section className="card divide-y divide-line">
-          {desk.rows.map((row) => (
-            <a key={row.account.id} href={accountHref(row.account.id)} className="flex items-center gap-4 px-5 py-4 hover:bg-panel-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate">{row.account.name}</p>
-                <p className="truncate text-sm text-faint">
-                  {row.account.institution} · {TYPE_LABEL[effectiveType(row.account)]}
-                </p>
-              </div>
-              <Spark values={row.series.filter((point) => point.date >= row.perf.from).map((point) => point.balance)} />
-              <div className="text-right">
-                <p className="num text-xl">
-                  <Money value={row.account.balance} currency={row.account.currency} />
-                </p>
-                <p className={`text-sm ${row.perf.change < 0 ? 'text-bad' : 'text-good'}`}>
-                  {formatSignedMoney(row.perf.change, desk.currency)}
-                  <span className="text-faint"> · {formatPct(row.perf.dietz)}</span>
-                </p>
-              </div>
-            </a>
-          ))}
+          {desk.rows.map((row) => {
+            const includePercent = normalizeIncludePercent(row.account.includePercent)
+            const weight = ownershipWeight(includePercent)
+            return (
+              <a key={row.account.id} href={accountHref(row.account.id)} className="flex items-center gap-4 px-5 py-4 hover:bg-panel-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">{row.account.name}</p>
+                  <p className="truncate text-sm text-faint">
+                    {row.account.institution} · {TYPE_LABEL[effectiveType(row.account)]}
+                    {weight === 0 ? ' · excluded' : weight < 1 ? ` · ${includePercent}%` : ''}
+                  </p>
+                </div>
+                <Spark values={row.series.filter((point) => point.date >= row.perf.from).map((point) => point.balance)} />
+                <div className="text-right">
+                  <p className="num text-xl">
+                    <Money value={row.account.balance} currency={row.account.currency} />
+                  </p>
+                  <p className={`text-sm ${row.perf.change < 0 ? 'text-bad' : 'text-good'}`}>
+                    {formatSignedMoney(row.perf.change, desk.currency)}
+                    <span className="text-faint"> · {formatPct(row.perf.dietz)}</span>
+                  </p>
+                </div>
+              </a>
+            )
+          })}
         </section>
       ) : null}
 

@@ -21,6 +21,11 @@ export interface AccountRecord {
   typeOverride: AccountType | null
   /** When true, a positive balance is an amount owed and net worth uses the opposite sign. */
   invertOwed: boolean | null
+  /**
+   * Share of this account that counts toward net worth, 0–100.
+   * 100 is the full balance. 0 excludes the account. 50 keeps half.
+   */
+  includePercent: number
   holdings: Holding[]
   updatedAt: number
 }

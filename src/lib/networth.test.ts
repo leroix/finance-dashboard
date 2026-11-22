@@ -15,6 +15,7 @@ function account(partial: Partial<AccountRecord> & Pick<AccountRecord, 'id' | 'b
     inferredType: 'cash',
     typeOverride: null,
     invertOwed: null,
+    includePercent: 100,
     holdings: [],
     updatedAt: 0,
     ...partial,
@@ -47,6 +48,19 @@ describe('net worth', () => {
     expect(totals.byType.cash).toBe(100)
     expect(totals.byType.liability).toBe(-40)
     expect(totals.excluded.map((item) => item.id)).toEqual(['eur'])
+  })
+
+  it('excludes an account or keeps only a percentage of it', () => {
+    expect(contribution(200, 'cash', null, 50)).toBe(100)
+    expect(contribution(200, 'cash', null, 0)).toBe(0)
+    const totals = computeTotals([
+      account({ id: 'cash', balance: 100, inferredType: 'cash' }),
+      account({ id: 'joint', balance: 200, inferredType: 'cash', includePercent: 50 }),
+      account({ id: 'old', balance: 500, inferredType: 'investment', includePercent: 0 }),
+    ])
+    expect(totals.netWorth).toBe(200)
+    expect(totals.included.map((item) => item.id).sort()).toEqual(['cash', 'joint'])
+    expect(totals.excluded.map((item) => item.id)).toEqual(['old'])
   })
 
   it('reconstructs past balances from transactions and lets a snapshot win', () => {
@@ -91,7 +105,26 @@ describe('net worth', () => {
     expect(books.accounts.map((item) => item.id).sort()).toEqual(['acct', 'house'])
     expect(books.accounts.find((item) => item.id === 'acct')?.typeOverride).toBe('cash')
     expect(books.accounts.find((item) => item.id === 'acct')?.balance).toBe(90)
+    expect(books.accounts.find((item) => item.id === 'acct')?.includePercent).toBe(100)
     expect(books.transactions[0]?.flowOverride).toBe('market')
+  })
+
+  it('keeps includePercent across a SimpleFIN refresh', () => {
+    const books = applySync(
+      {
+        accounts: [account({ id: 'acct', balance: 80, includePercent: 40 })],
+        transactions: [],
+        snapshots: [],
+      },
+      {
+        accounts: [account({ id: 'acct', balance: 90 })],
+        transactions: [],
+        snapshots: [],
+      },
+      'replace',
+    )
+    expect(books.accounts.find((item) => item.id === 'acct')?.includePercent).toBe(40)
+    expect(books.accounts.find((item) => item.id === 'acct')?.balance).toBe(90)
   })
 
   it('builds a desk where flows explain a cash balance change', () => {

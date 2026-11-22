@@ -4,6 +4,7 @@ import {
   buildRawSeries,
   contribution,
   effectiveType,
+  ownershipWeight,
   reportingCurrency,
   valueAt,
   type DailyPoint,
@@ -30,6 +31,7 @@ export interface DeskModel {
   byType: { type: AccountType; label: string; value: number }[]
   byInstitution: { name: string; value: number }[]
   excluded: AccountRecord[]
+  omitted: AccountRecord[]
   series: DailyPoint[]
   performance: Perf
   rows: AccountRow[]
@@ -57,6 +59,7 @@ export function accountPerformance(
   today: string,
 ): { series: DailyPoint[]; perf: Perf; value: number } {
   const type = effectiveType(account)
+  const weight = ownershipWeight(account.includePercent)
   const series = buildRawSeries(
     account.balance,
     account.balanceDate,
@@ -64,7 +67,7 @@ export function accountPerformance(
     snaps.filter((snap) => snap.accountId === account.id),
     today,
   )
-  const value = contribution(account.balance, type, account.invertOwed)
+  const value = contribution(account.balance, type, account.invertOwed, account.includePercent)
   const sign = type === 'liability' && account.invertOwed ? -1 : 1
   const requested = periodStart(period, today)
   const first = series[0]
@@ -75,8 +78,8 @@ export function accountPerformance(
   const partial = requested !== null && requested < first.date
   const startPoint = valueAt(series, from) ?? first
   const endPoint = last
-  const startBalance = contribution(startPoint.balance, type, account.invertOwed)
-  const endBalance = contribution(endPoint.balance, type, account.invertOwed)
+  const startBalance = contribution(startPoint.balance, type, account.invertOwed, account.includePercent)
+  const endBalance = contribution(endPoint.balance, type, account.invertOwed, account.includePercent)
   const bounds = periodBounds(startPoint.date, today)
   const flows = txs
     .filter((tx) => tx.accountId === account.id && !tx.pending && tx.posted > 0)
@@ -85,7 +88,7 @@ export function accountPerformance(
       return date > startPoint.date && date <= today
     })
     .filter((tx) => (tx.flowOverride ?? classifyTransaction(tx.description, type)) === 'flow')
-    .map((tx) => ({ atMs: tx.posted * 1000, amount: sign * tx.amount }))
+    .map((tx) => ({ atMs: tx.posted * 1000, amount: sign * tx.amount * weight }))
   const dietz = modifiedDietz(startBalance, endBalance, bounds.startMs, bounds.endMs, flows)
   return {
     series,
@@ -102,34 +105,43 @@ export function buildDesk(
   today: string,
 ): DeskModel {
   const currency = reportingCurrency(accounts) ?? 'USD'
-  const included = accounts.filter((account) => account.currency === currency)
+  const sameCurrency = accounts.filter((account) => account.currency === currency)
+  const omitted = sameCurrency.filter((account) => ownershipWeight(account.includePercent) === 0)
   const excluded = accounts.filter((account) => account.currency !== currency)
-  const rows = included
+  const rows = sameCurrency
     .map((account) => {
       const view = accountPerformance(account, txs, snaps, period, today)
       return { account, ...view }
     })
-    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+    .sort((a, b) => {
+      const wa = ownershipWeight(a.account.includePercent)
+      const wb = ownershipWeight(b.account.includePercent)
+      if (wa === 0 && wb !== 0) return 1
+      if (wb === 0 && wa !== 0) return -1
+      return Math.abs(b.value) - Math.abs(a.value)
+    })
 
   const byTypeMap: Record<AccountType, number> = { cash: 0, liability: 0, investment: 0, other: 0 }
   const institutions = new Map<string, number>()
   let netWorth = 0
   for (const row of rows) {
+    if (ownershipWeight(row.account.includePercent) === 0) continue
     netWorth += row.value
     byTypeMap[effectiveType(row.account)] += row.value
     const name = row.account.institution || 'Unknown'
     institutions.set(name, (institutions.get(name) ?? 0) + row.value)
   }
 
+  const activeRows = rows.filter((row) => ownershipWeight(row.account.includePercent) > 0)
   const dates = new Set<string>()
-  for (const row of rows) for (const point of row.series) dates.add(point.date)
+  for (const row of activeRows) for (const point of row.series) dates.add(point.date)
   const fullSeries: DailyPoint[] = [...dates].sort().map((date) => {
     let balance = 0
     let estimated = false
-    for (const row of rows) {
+    for (const row of activeRows) {
       const point = valueAt(row.series, date)
       if (!point) continue
-      balance += contribution(point.balance, effectiveType(row.account), row.account.invertOwed)
+      balance += contribution(point.balance, effectiveType(row.account), row.account.invertOwed, row.account.includePercent)
       if (point.estimated) estimated = true
     }
     return { date, balance, estimated }
@@ -145,14 +157,15 @@ export function buildDesk(
   const endBalance = endPoint?.balance ?? netWorth
   const flowFrom = startPoint?.date ?? from
   const flows: { atMs: number; amount: number }[] = []
-  for (const row of rows) {
+  for (const row of activeRows) {
     const type = effectiveType(row.account)
+    const weight = ownershipWeight(row.account.includePercent)
     const sign = type === 'liability' && row.account.invertOwed ? -1 : 1
     const opened = row.series[0]
     if (opened && opened.date > flowFrom) {
       flows.push({
         atMs: parseLocalISODate(opened.date) + 12 * 60 * 60 * 1000,
-        amount: contribution(opened.balance, type, row.account.invertOwed),
+        amount: contribution(opened.balance, type, row.account.invertOwed, row.account.includePercent),
       })
     }
     for (const tx of txs) {
@@ -160,7 +173,7 @@ export function buildDesk(
       const date = localISODate(tx.posted * 1000)
       if (date <= flowFrom || date > today) continue
       if ((tx.flowOverride ?? classifyTransaction(tx.description, type)) !== 'flow') continue
-      flows.push({ atMs: tx.posted * 1000, amount: sign * tx.amount })
+      flows.push({ atMs: tx.posted * 1000, amount: sign * tx.amount * weight })
     }
   }
   const bounds = periodBounds(flowFrom, today)
@@ -177,6 +190,7 @@ export function buildDesk(
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => Math.abs(b.value) - Math.abs(a.value)),
     excluded,
+    omitted,
     series: visible.length ? visible : fullSeries,
     performance: { ...dietz, from: flowFrom, to: today, partial },
     rows,

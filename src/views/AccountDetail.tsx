@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { LineChart } from '../components/Charts.tsx'
 import { Button, Money, PeriodTabs, controlClass } from '../components/ui.tsx'
 import { formatMediumDate, localISODate, todayISO } from '../lib/dates.ts'
 import { formatPct, formatSignedMoney } from '../lib/money.ts'
 import { accountPerformance } from '../lib/model.ts'
-import { contribution, effectiveType } from '../lib/networth.ts'
+import { contribution, effectiveType, normalizeIncludePercent, ownershipWeight } from '../lib/networth.ts'
 import type { PeriodKey } from '../lib/returns.ts'
 import { TYPE_LABEL, type AccountType, type FlowClass } from '../lib/types.ts'
 import { useStore } from '../state/store.tsx'
@@ -18,7 +18,11 @@ export function AccountDetail({ id }: { id: string }) {
   const [period, setPeriod] = useState<PeriodKey>('1Y')
   const [editing, setEditing] = useState(false)
   const [limit, setLimit] = useState(80)
+  const [includeDraft, setIncludeDraft] = useState('')
   const todayIso = todayISO()
+  useEffect(() => {
+    setIncludeDraft('')
+  }, [id])
   const view = useMemo(() => {
     if (!account) return null
     return accountPerformance(account, store.transactions, store.snapshots, period, todayIso)
@@ -36,10 +40,13 @@ export function AccountDetail({ id }: { id: string }) {
   }
 
   const type = effectiveType(account)
+  const includePercent = normalizeIncludePercent(account.includePercent)
+  const weight = ownershipWeight(includePercent)
   const txs = store.transactions
     .filter((tx) => tx.accountId === account.id)
     .sort((a, b) => b.posted - a.posted)
   const shown = txs.slice(0, limit)
+  const includeField = includeDraft === '' ? String(includePercent) : includeDraft
 
   return (
     <div className="space-y-6 pb-10">
@@ -50,6 +57,7 @@ export function AccountDetail({ id }: { id: string }) {
         <h1 className="num mt-2 text-4xl md:text-5xl">{account.name}</h1>
         <p className="mt-1 text-sm text-muted">
           {account.institution} · {account.source === 'manual' ? 'Manual' : 'SimpleFIN'} · {account.currency}
+          {weight === 0 ? ' · excluded from net worth' : weight < 1 ? ` · ${includePercent}% in net worth` : ''}
         </p>
       </div>
       <section className="card p-5 md:p-7">
@@ -61,7 +69,10 @@ export function AccountDetail({ id }: { id: string }) {
             </p>
             <p className="mt-2 text-sm text-muted">
               In net worth{' '}
-              <Money value={contribution(account.balance, type, account.invertOwed)} currency={account.currency} />
+              <Money
+                value={contribution(account.balance, type, account.invertOwed, account.includePercent)}
+                currency={account.currency}
+              />
               {' · '}
               {formatSignedMoney(view.perf.change, account.currency)} this period · est. {formatPct(view.perf.dietz)}
             </p>
@@ -110,6 +121,49 @@ export function AccountDetail({ id }: { id: string }) {
             <span className="text-faint">Turn this on for a credit card or loan that reports what you owe as a positive number.</span>
           </span>
         </label>
+        <div className="md:col-span-2 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+          <label className="block text-sm">
+            <span className="mb-1.5 block text-muted">Share in net worth</span>
+            <input
+              className={controlClass}
+              inputMode="decimal"
+              value={includeField}
+              onChange={(event) => setIncludeDraft(event.target.value)}
+              onBlur={() => {
+                const next = Number(includeField)
+                if (!Number.isFinite(next)) {
+                  setIncludeDraft('')
+                  return
+                }
+                void store.setIncludePercent(account.id, next).then(() => setIncludeDraft(''))
+              }}
+              aria-describedby="include-help"
+            />
+            <span id="include-help" className="mt-1.5 block text-xs text-faint">
+              100 keeps the full balance. 0 excludes the account. 50 keeps half. The full balance is still shown above.
+            </span>
+          </label>
+          <Button
+            variant="quiet"
+            disabled={includePercent === 0}
+            onClick={() => {
+              setIncludeDraft('')
+              void store.setIncludePercent(account.id, 0)
+            }}
+          >
+            Exclude
+          </Button>
+          <Button
+            variant="quiet"
+            disabled={includePercent === 100}
+            onClick={() => {
+              setIncludeDraft('')
+              void store.setIncludePercent(account.id, 100)
+            }}
+          >
+            Include all
+          </Button>
+        </div>
       </section>
 
       {account.holdings.length > 0 ? (

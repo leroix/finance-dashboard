@@ -2,7 +2,12 @@ import type { AccountRecord, Books, SnapshotRecord, TransactionRecord } from './
 
 function withOverrides(incoming: AccountRecord, prev?: AccountRecord): AccountRecord {
   if (!prev) return incoming
-  return { ...incoming, typeOverride: prev.typeOverride, invertOwed: prev.invertOwed }
+  return {
+    ...incoming,
+    typeOverride: prev.typeOverride,
+    invertOwed: prev.invertOwed,
+    includePercent: prev.includePercent,
+  }
 }
 
 export function applySync(
