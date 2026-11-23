@@ -10,6 +10,7 @@ import {
   inferAccountType,
   isDemoMaterial,
   parseAccountSet,
+  parseUnixSeconds,
   splitAccessUrl,
 } from './simplefin.ts'
 
@@ -91,6 +92,28 @@ describe('SimpleFIN parsing', () => {
     expect(inferAccountType('Roth IRA')).toBe('investment')
     expect(inferAccountType('Individual', 'Vanguard')).toBe('investment')
     expect(inferAccountType('House')).toBe('other')
+  })
+
+  it('parses balance-date from numbers or numeric strings and keeps available balance', () => {
+    expect(parseUnixSeconds(1_700_000_000)).toBe(1_700_000_000)
+    expect(parseUnixSeconds('1700000000')).toBe(1_700_000_000)
+    expect(parseUnixSeconds('nope')).toBeNull()
+    const parsed = parseAccountSet({
+      accounts: [
+        {
+          id: 'chk',
+          name: 'Checking',
+          currency: 'USD',
+          balance: '100.23',
+          'available-balance': '75.23',
+          'balance-date': '1700000000',
+          org: { name: 'Demo Bank', id: 'demo' },
+        },
+      ],
+    })
+    expect(parsed.accounts[0]?.balance).toBe(100.23)
+    expect(parsed.accounts[0]?.availableBalance).toBe(75.23)
+    expect(parsed.accounts[0]?.balanceDate).toBe(1_700_000_000)
   })
 
   it('pages history in contiguous windows under the bridge cap', () => {

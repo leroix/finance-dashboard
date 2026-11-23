@@ -34,7 +34,8 @@ npm run preview  # serves dist/ with the production CSP
 ## What you can do
 
 - Total net worth, split by institution and by type (cash, credit & liabilities, investment & retirement, other).
-- Net-worth and per-account history. Each refresh stores that day’s balance. Earlier days are reconstructed from transactions and labeled as estimates.
+- Net-worth and per-account history. Each refresh stores that day’s **ledger** balance from SimpleFIN (`balance` as of `balance-date`). When the bridge also sends `available-balance` and it differs (pending holds), Sable shows both. Bank apps often emphasize available; credit cards are usually a positive amount owed even when the bank UI shows a minus sign.
+- Each refresh stores that day’s balance snapshot. Earlier days are reconstructed from transactions and labeled as estimates.
 - Change over 1M, 3M, YTD, 1Y, and all, with an estimated modified Dietz return. Spending, pay, and transfers are treated as flows. Interest, dividends, and fees stay in the market result. You can override any transaction.
 - Manual accounts (a house, a car, a loan) with editable values.
 - A projection from monthly savings, expected return, and inflation. It is marked as a projection.

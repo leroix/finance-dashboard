@@ -167,6 +167,16 @@ function firstString(obj: Record<string, unknown>, keys: string[]): string {
   return ''
 }
 
+/** Accept numeric or numeric-string UNIX timestamps from Bridge payloads. */
+export function parseUnixSeconds(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value)
+    if (Number.isFinite(n)) return Math.trunc(n)
+  }
+  return null
+}
+
 function collectErrors(data: Record<string, unknown>): string[] {
   const out: string[] = []
   const push = (value: unknown) => {
@@ -256,7 +266,7 @@ export function parseAccountSet(data: unknown): ParsedSet {
     const currencyRaw = typeof account.currency === 'string' ? account.currency.trim() : 'USD'
     const currency = currencyRaw.startsWith('http') ? currencyRaw : currencyRaw.toUpperCase() || 'USD'
     const available = parseAmount(account['available-balance'])
-    const balanceDate = typeof account['balance-date'] === 'number' ? Math.trunc(account['balance-date']) : null
+    const balanceDate = parseUnixSeconds(account['balance-date'])
     const holdings = Array.isArray(account.holdings)
       ? account.holdings.map(parseHolding).filter((item): item is Holding => item !== null)
       : []
@@ -266,7 +276,7 @@ export function parseAccountSet(data: unknown): ParsedSet {
       name,
       currency,
       balance: roundCents(balance),
-      availableBalance: available,
+      availableBalance: available === null ? null : roundCents(available),
       balanceDate,
       institution,
       connId,
@@ -400,11 +410,17 @@ export async function fetchAccountSet(
       },
       credentials: 'omit',
       cache: 'no-store',
+      redirect: 'manual',
       referrerPolicy: 'no-referrer',
     })
   } catch {
     throw new SimpleFINError(
       'The browser could not reach SimpleFIN Bridge. Check the connection, or that this site is allowed to call beta-bridge.simplefin.org.',
+    )
+  }
+  if (res.type === 'opaqueredirect' || res.status === 0) {
+    throw new SimpleFINError(
+      'SimpleFIN Bridge redirected this request in a way the browser cannot follow. Try Refresh again, or reconnect.',
     )
   }
   if (res.status === 403) {

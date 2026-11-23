@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LineChart } from '../components/Charts.tsx'
 import { Button, Money, PeriodTabs, controlClass } from '../components/ui.tsx'
-import { formatMediumDate, localISODate, todayISO } from '../lib/dates.ts'
+import { formatBalanceAsOf, formatMediumDate, localISODate, todayISO } from '../lib/dates.ts'
 import { formatPct, formatSignedMoney } from '../lib/money.ts'
 import { accountPerformance } from '../lib/model.ts'
 import { contribution, effectiveType, normalizeIncludePercent, ownershipWeight } from '../lib/networth.ts'
@@ -43,6 +43,9 @@ export function AccountDetail({ id }: { id: string }) {
   const type = effectiveType(account)
   const includePercent = normalizeIncludePercent(account.includePercent)
   const weight = ownershipWeight(includePercent)
+  const asOf = formatBalanceAsOf(account.balanceDate)
+  const available = account.availableBalance
+  const availableDiffers = available != null && available !== account.balance
   const accountId = account.id
   const txs = store.transactions
     .filter((tx) => tx.accountId === accountId)
@@ -76,10 +79,19 @@ export function AccountDetail({ id }: { id: string }) {
       <section className="card p-5 md:p-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm text-muted">Balance</p>
+            <p className="text-sm text-muted">Ledger balance{asOf ? ` · ${asOf}` : ''}</p>
             <p className="num text-5xl">
               <Money value={account.balance} currency={account.currency} />
             </p>
+            {availableDiffers && available != null ? (
+              <p className="mt-2 text-sm text-muted">
+                Available to spend{' '}
+                <span className="num text-paper">
+                  <Money value={available} currency={account.currency} />
+                </span>
+                <span className="text-faint"> · bank apps often show this number</span>
+              </p>
+            ) : null}
             <p className="mt-2 text-sm text-muted">
               In net worth{' '}
               <Money
@@ -89,6 +101,12 @@ export function AccountDetail({ id }: { id: string }) {
               {' · '}
               {formatSignedMoney(view.perf.change, account.currency)} this period · est. {formatPct(view.perf.dietz)}
             </p>
+            {account.source === 'simplefin' ? (
+              <p className="mt-2 max-w-xl text-xs text-faint">
+                Sable shows the SimpleFIN ledger balance, not a live bank-app total. Pending holds can make available
+                differ. Credit cards are usually a positive amount owed here even when the bank app shows a minus sign.
+              </p>
+            ) : null}
           </div>
           <PeriodTabs value={period} onChange={setPeriod} />
         </div>

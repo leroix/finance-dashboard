@@ -54,6 +54,19 @@ export function formatRelative(ms: number, now = Date.now()): string {
   return `${days}d ago`
 }
 
+/** Human label for a SimpleFIN balance-date (UNIX seconds). */
+export function formatBalanceAsOf(balanceDateSec: number | null, now = Date.now()): string | null {
+  if (balanceDateSec == null || !Number.isFinite(balanceDateSec) || balanceDateSec <= 0) return null
+  const ms = balanceDateSec * 1000
+  if (ms > now + 60_000) {
+    return `as of ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(ms)}`
+  }
+  const age = now - ms
+  if (age < 2 * 60_000) return 'as of just now'
+  if (age < 36 * 60_000) return `as of ${formatRelative(ms, now)}`
+  return `as of ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(ms)}`
+}
+
 export function unixNow(now = Date.now()): number {
   return Math.floor(now / 1000)
 }

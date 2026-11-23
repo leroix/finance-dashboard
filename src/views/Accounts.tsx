@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Button, Field, Money, controlClass } from '../components/ui.tsx'
+import { formatBalanceAsOf } from '../lib/dates.ts'
 import { contribution, effectiveType, normalizeIncludePercent, ownershipWeight } from '../lib/networth.ts'
 import { TYPE_LABEL, type AccountType } from '../lib/types.ts'
 import { accountHref } from '../router.ts'
@@ -33,6 +34,9 @@ export function Accounts() {
           {store.accounts.map((account) => {
             const includePercent = normalizeIncludePercent(account.includePercent)
             const weight = ownershipWeight(includePercent)
+            const asOf = formatBalanceAsOf(account.balanceDate)
+            const available = account.availableBalance
+            const availableDiffers = available != null && available !== account.balance
             return (
               <li key={account.id}>
                 <a href={accountHref(account.id)} className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-panel-2">
@@ -49,6 +53,13 @@ export function Accounts() {
                       <Money value={account.balance} currency={account.currency} />
                     </span>
                     <span className="block text-xs text-faint">
+                      {availableDiffers && available != null ? (
+                        <>
+                          Available <Money value={available} currency={account.currency} />
+                          {' · '}
+                        </>
+                      ) : null}
+                      {asOf ? `${asOf} · ` : ''}
                       In net worth{' '}
                       <Money
                         value={contribution(
