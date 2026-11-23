@@ -32,7 +32,7 @@ export function SecurityActions({ intent }: { intent: 'lock' | 'unlock' }) {
     <div className="mt-3 flex flex-wrap gap-2">
       {locking && store.prf !== 'no' ? (
         <Button variant="primary" disabled={store.syncing} onClick={() => void store.lockPasskey()}>
-          Lock with passkey
+          Protect with passkey
         </Button>
       ) : null}
       {!locking && store.secret?.method === 'prf' ? (
@@ -42,17 +42,18 @@ export function SecurityActions({ intent }: { intent: 'lock' | 'unlock' }) {
       ) : null}
       {(locking || store.secret?.method === 'passphrase') && (
         <Button variant="quiet" disabled={store.syncing} onClick={() => setOpen('passphrase')}>
-          {locking ? 'Lock with a passphrase' : 'Unlock with passphrase'}
+          {locking ? 'Protect with a passphrase' : 'Unlock with passphrase'}
         </Button>
       )}
       {locking && prfOff ? (
         <p className="w-full text-xs text-faint">
-          This browser does not report support for the passkey PRF extension, so a passphrase or a fresh paste each session is the fallback.
+          This browser does not report support for the passkey PRF extension, so a passphrase is the way to encrypt the
+          books on this device.
         </p>
       ) : null}
       <Dialog
         open={open === 'passphrase'}
-        title={locking ? 'Lock with a passphrase' : 'Unlock'}
+        title={locking ? 'Protect with a passphrase' : 'Unlock'}
         onClose={() => setOpen(null)}
       >
         <form
@@ -83,8 +84,8 @@ export function SecurityActions({ intent }: { intent: 'lock' | 'unlock' }) {
           {localError ? <p className="text-sm text-bad">{localError}</p> : null}
           <p className="text-xs text-faint">
             {locking
-              ? 'Sable stretches this with PBKDF2-SHA256, 600,000 rounds, then AES-GCM. The passphrase is not stored.'
-              : 'This only decrypts the access URL saved on this device.'}
+              ? 'Sable stretches this with PBKDF2-SHA256, 600,000 rounds, then AES-GCM. The passphrase is not stored. Accounts, balances, and the access URL are encrypted together.'
+              : 'This decrypts the vault on this device: books and the SimpleFIN access URL.'}
           </p>
           <Button type="submit" variant="primary" disabled={store.syncing}>
             {locking ? 'Encrypt and save' : 'Unlock'}

@@ -8,6 +8,7 @@ import { Connect } from '../views/Connect.tsx'
 import { Desk } from '../views/Desk.tsx'
 import { Forecast } from '../views/Forecast.tsx'
 import { Settings } from '../views/Settings.tsx'
+import { UnlockGate } from './UnlockGate.tsx'
 import { cx } from './ui.tsx'
 
 const NAV = [
@@ -48,6 +49,10 @@ export function Shell() {
         </div>
       </main>
     )
+  }
+
+  if (store.locked) {
+    return <UnlockGate />
   }
 
   let page: ReactNode

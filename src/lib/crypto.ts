@@ -3,7 +3,10 @@ import { b64ToBytes, bytesToB64, bytesToUtf8, exactBuffer, randomBytes, utf8ToBy
 /** OWASP-aligned PBKDF2-HMAC-SHA256 iteration count. WebCrypto, no extra wasm. */
 export const PBKDF2_ITERATIONS = 600_000
 
-const ACCESS_INFO = utf8ToBytes('sable-access-url-v1')
+/** Legacy HKDF info when the passkey only wrapped the SimpleFIN access URL. */
+export const HKDF_INFO_ACCESS = utf8ToBytes('sable-access-url-v1')
+/** HKDF info when the passkey wraps the vault data-encryption key. */
+export const HKDF_INFO_VAULT = utf8ToBytes('sable-vault-dek-v1')
 
 export interface CipherPack {
   iv: string
@@ -34,10 +37,14 @@ export async function deriveAesKeyFromPassphrase(
   )
 }
 
-export async function deriveAesKeyFromPrf(prf: Uint8Array, salt: Uint8Array): Promise<CryptoKey> {
+export async function deriveAesKeyFromPrf(
+  prf: Uint8Array,
+  salt: Uint8Array,
+  info: Uint8Array = HKDF_INFO_VAULT,
+): Promise<CryptoKey> {
   const material = await subtle().importKey('raw', exactBuffer(prf), 'HKDF', false, ['deriveKey'])
   return subtle().deriveKey(
-    { name: 'HKDF', hash: 'SHA-256', salt: exactBuffer(salt), info: exactBuffer(ACCESS_INFO) },
+    { name: 'HKDF', hash: 'SHA-256', salt: exactBuffer(salt), info: exactBuffer(info) },
     material,
     { name: 'AES-GCM', length: 256 },
     false,

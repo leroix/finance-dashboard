@@ -1,5 +1,6 @@
 import type { AccountRecord, Books, Meta, SecretRecord, Settings, SnapshotRecord, TransactionRecord } from './types.ts'
 import { DEFAULT_META, DEFAULT_SETTINGS } from './types.ts'
+import { isVaultSeal, type VaultSeal } from './vault.ts'
 
 const DB_NAME = 'sable'
 const DB_VERSION = 1
@@ -8,6 +9,7 @@ export interface Bundle extends Books {
   secret: SecretRecord | null
   settings: Settings
   meta: Meta
+  vault: VaultSeal | null
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -45,7 +47,21 @@ export async function loadBundle(): Promise<Bundle> {
     const settings = { ...DEFAULT_SETTINGS, ...(find('settings') as Partial<Settings> | undefined) }
     const meta = { ...DEFAULT_META, ...(find('meta') as Partial<Meta> | undefined) }
     const secret = (find('secret') as SecretRecord | null | undefined) ?? null
-    return { accounts, transactions, snapshots, settings, meta, secret }
+    const vaultRaw = find('vault')
+    const vault = isVaultSeal(vaultRaw) ? vaultRaw : null
+    // When a sealed vault exists, never surface plaintext rows that might still be left over.
+    if (vault) {
+      return {
+        accounts: [],
+        transactions: [],
+        snapshots: [],
+        settings: DEFAULT_SETTINGS,
+        meta: DEFAULT_META,
+        secret,
+        vault,
+      }
+    }
+    return { accounts, transactions, snapshots, settings, meta, secret, vault: null }
   } finally {
     db.close()
   }
@@ -64,12 +80,26 @@ export async function persistBundle(bundle: Bundle): Promise<void> {
         store.clear()
         for (const row of rows) store.put(row)
       }
-      write('accounts', bundle.accounts)
-      write('transactions', bundle.transactions)
-      write('snapshots', bundle.snapshots)
+      // Sealed vault: keep financial rows empty on disk. Soft metadata stays only inside the ciphertext.
+      if (bundle.vault) {
+        write('accounts', [])
+        write('transactions', [])
+        write('snapshots', [])
+      } else {
+        write('accounts', bundle.accounts)
+        write('transactions', bundle.transactions)
+        write('snapshots', bundle.snapshots)
+      }
       const kv = tx.objectStore('kv')
-      kv.put({ id: 'settings', value: bundle.settings })
-      kv.put({ id: 'meta', value: bundle.meta })
+      if (bundle.vault) {
+        kv.delete('settings')
+        kv.delete('meta')
+        kv.put({ id: 'vault', value: bundle.vault })
+      } else {
+        kv.put({ id: 'settings', value: bundle.settings })
+        kv.put({ id: 'meta', value: bundle.meta })
+        kv.delete('vault')
+      }
       if (bundle.secret) kv.put({ id: 'secret', value: bundle.secret })
       else kv.delete('secret')
     })

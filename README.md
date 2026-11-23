@@ -4,12 +4,13 @@ Sable is a private net-worth desk for one person. It reads accounts from [Simple
 
 ## Privacy model
 
-- Accounts, transactions, daily balance snapshots, and settings live in IndexedDB on this device.
-- The SimpleFIN access URL is a secret. After you connect, lock it with a passkey or a passphrase. Sable stores only ciphertext, a credential id, and salts. The URL is not written into the page address, source code, or logs.
-- Keep a copy of the access URL in your password manager. **Forget saved key** deletes the encrypted copy in this browser and leaves the balances. **Erase all local data** deletes the balances too.
+- After you **Protect** with a passkey or passphrase, accounts, transactions, daily balance snapshots, settings, and the SimpleFIN access URL are sealed together in an AES-GCM vault in IndexedDB. A random 256-bit data key encrypts the vault; that key is wrapped by your passkey or passphrase. Plaintext rows are not kept on disk.
+- Opening the app with a vault present shows only an unlock screen. No balances, account names, or sync metadata are loaded into the UI until the passkey or passphrase succeeds. **Lock this session** clears the in-memory key and books without deleting the vault.
+- The access URL is never written into the page address, source code, or logs. Keep a copy in your password manager. **Remove SimpleFIN access** drops the URL from the vault and leaves encrypted balances. **Erase all local data** deletes the vault too.
+- Until you protect the books the first time, newly synced data may still sit in plaintext IndexedDB stores. Sable prompts you to encrypt after connecting.
 - The only network calls are HTTPS requests to SimpleFIN Bridge. A strict Content-Security-Policy allows `connect-src` only for `https://beta-bridge.simplefin.org` and `https://bridge.simplefin.org`. Scripts are `'self'` only. The production page has no inline script.
 - `bridge.simplefin.org` currently answers with a 302 to `https://beta-bridge.simplefin.org/` that drops the path and sends no `Access-Control-Allow-Origin`. Sable rewrites that host to `beta-bridge.simplefin.org` before calling, and does not follow the broken redirect.
-- Passwords for backups and for the passphrase lock are stretched with PBKDF2-HMAC-SHA256 (600,000 iterations) and encrypted with AES-GCM. A passkey uses the WebAuthn PRF extension, then HKDF-SHA256, then AES-GCM. Argon2 is not used because it is not in WebCrypto; the iteration count matches the current OWASP PBKDF2 guidance.
+- Passwords for backups and for the passphrase vault are stretched with PBKDF2-HMAC-SHA256 (600,000 iterations) and encrypted with AES-GCM. A passkey uses the WebAuthn PRF extension, then HKDF-SHA256, then AES-GCM. Argon2 is not used because it is not in WebCrypto; the iteration count matches the current OWASP PBKDF2 guidance.
 - Non-USD and custom (URL) currencies are listed and are not mixed into the dollar total. Sable does not call a foreign-exchange service.
 - An encrypted backup can optionally carry the access URL inside the ciphertext so you can move browsers. A plain CSV of transactions does not.
 

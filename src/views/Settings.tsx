@@ -16,12 +16,17 @@ export function Settings() {
   const [confirming, setConfirming] = useState<'forget' | 'erase' | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
 
-  const lockLabel =
-    store.secret?.method === 'prf'
-      ? 'Passkey'
+  const lockLabel = store.vault
+    ? store.secret?.method === 'prf'
+      ? 'Passkey vault'
       : store.secret?.method === 'passphrase'
-        ? 'Passphrase'
-        : 'Not saved'
+        ? 'Passphrase vault'
+        : 'Encrypted'
+    : store.secret?.method === 'prf'
+      ? 'Legacy passkey (access only)'
+      : store.secret?.method === 'passphrase'
+        ? 'Legacy passphrase (access only)'
+        : 'Not protected'
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-12">
@@ -67,17 +72,23 @@ export function Settings() {
       </section>
 
       <section className="card p-5">
-        <h2 className="text-lg">Lock</h2>
+        <h2 className="text-lg">Vault</h2>
         <p className="mt-2 text-sm text-muted">
-          A passkey uses the WebAuthn PRF extension. The PRF output is stretched with HKDF into an AES-GCM key, and only
-          the ciphertext, credential id, and salts are stored. If PRF is missing, use a passphrase or paste the access
-          URL each session. Keep a copy in your password manager either way.
+          Protect encrypts accounts, balances, settings, and the SimpleFIN access URL with AES-GCM. A random data key is
+          wrapped by your passkey (WebAuthn PRF → HKDF) or passphrase (PBKDF2). Only ciphertext stays in IndexedDB. Lock
+          this session before someone else uses the device; a fresh visit always asks you to unlock first.
         </p>
-        {store.hasAccess ? <SecurityActions intent="lock" /> : null}
-        {store.secret && !store.hasAccess ? <SecurityActions intent="unlock" /> : null}
+        {store.hasAccess || store.accounts.length > 0 ? <SecurityActions intent="lock" /> : null}
+        {store.vault ? (
+          <div className="mt-3">
+            <Button variant="primary" disabled={store.syncing} onClick={() => void store.lockSession()}>
+              Lock this session
+            </Button>
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="quiet" disabled={!store.secret} onClick={() => setConfirming('forget')}>
-            Forget saved key
+          <Button variant="quiet" disabled={!store.hasAccess && !store.secret} onClick={() => setConfirming('forget')}>
+            Remove SimpleFIN access
           </Button>
           <Button variant="danger" onClick={() => setConfirming('erase')}>
             Erase all local data
@@ -171,13 +182,13 @@ export function Settings() {
 
       <Dialog
         open={confirming !== null}
-        title={confirming === 'erase' ? 'Erase everything stored here?' : 'Forget the saved key?'}
+        title={confirming === 'erase' ? 'Erase everything stored here?' : 'Remove SimpleFIN access?'}
         onClose={() => setConfirming(null)}
       >
         <p className="text-sm text-muted">
           {confirming === 'erase'
-            ? 'This deletes accounts, transactions, snapshots, settings, and the encrypted access URL from this browser.'
-            : 'This deletes only the encrypted access URL. Balances stay. You will need the access URL from your password manager to refresh.'}
+            ? 'This deletes the encrypted vault, accounts, and any saved lock from this browser.'
+            : 'This removes the SimpleFIN access URL from the vault. Encrypted balances stay. You will need the access URL from your password manager to refresh.'}
         </p>
         <div className="mt-4 flex gap-2">
           <Button
@@ -187,7 +198,7 @@ export function Settings() {
               void action.then(() => setConfirming(null))
             }}
           >
-            {confirming === 'erase' ? 'Erase' : 'Forget key'}
+            {confirming === 'erase' ? 'Erase' : 'Remove access'}
           </Button>
           <Button variant="ghost" onClick={() => setConfirming(null)}>
             Cancel

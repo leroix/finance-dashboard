@@ -12,7 +12,8 @@ export function Connect() {
       <h1 className="num mt-2 text-4xl md:text-5xl">Bring the accounts in. Leave them here.</h1>
       <p className="mt-4 text-muted">
         Paste a one-time setup token, or an access URL you already claimed. Sable exchanges it in the browser, then
-        keeps balances in IndexedDB. The access URL is never put in the page address.
+        keeps balances in an encrypted vault in IndexedDB after you protect them. The access URL is never put in the page
+        address.
       </p>
       <div className="mt-6">
         <Button

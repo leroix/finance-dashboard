@@ -31,8 +31,9 @@ export function Desk() {
               Dismiss
             </button>
           </div>
-          {store.hasAccess && !store.secret ? <SecurityActions intent="lock" /> : null}
-          {store.secret && !store.hasAccess ? <SecurityActions intent="unlock" /> : null}
+          {!store.vault && (store.hasAccess || store.accounts.length > 0) ? (
+            <SecurityActions intent="lock" />
+          ) : null}
         </Banner>
       ) : null}
       {store.meta.lastErrors.length > 0 ? (
@@ -52,10 +53,13 @@ export function Desk() {
           </div>
         </Banner>
       ) : null}
-      {!store.hasAccess && store.secret ? (
+      {!store.vault && (store.hasAccess || store.accounts.length > 0) && !store.banner ? (
         <Banner>
-          <p>The access URL is locked. Balances already saved on this device are shown below. Unlock to refresh.</p>
-          <SecurityActions intent="unlock" />
+          <p>
+            These books are still stored in the clear on this device. Protect them with a passkey or passphrase so a
+            shared browser cannot read balances without unlocking.
+          </p>
+          <SecurityActions intent="lock" />
         </Banner>
       ) : null}
 

@@ -49,7 +49,12 @@ export interface SnapshotRecord {
   source: 'observed' | 'manual'
 }
 
+/**
+ * Wrapper for the vault data-encryption key (kind `vault`), or legacy ciphertext of the
+ * SimpleFIN access URL alone (kind `access` / omitted).
+ */
 export interface SecretRecord {
+  kind?: 'access' | 'vault'
   method: 'prf' | 'passphrase'
   credentialId?: string
   prfSalt?: string
